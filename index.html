@@ -1,0 +1,294 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#1f6feb">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<title>Calendar</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon-192.png">
+<style>
+:root{--bg:#f6f7f9;--card:#fff;--text:#1b1f24;--muted:#6b7280;--line:#e5e7eb;--accent:#1f6feb;--green:#16a34a;--red:#dc2626;--today:#e8f0fe}
+@media (prefers-color-scheme:dark){:root{--bg:#0f1115;--card:#181b21;--text:#e6e8eb;--muted:#9aa1ab;--line:#2a2e36;--accent:#4c8dff;--today:#1c2a44}}
+*{box-sizing:border-box}
+body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:var(--bg);color:var(--text);padding-bottom:calc(64px + env(safe-area-inset-bottom))}
+header{position:sticky;top:0;background:var(--card);border-bottom:1px solid var(--line);padding:calc(10px + env(safe-area-inset-top)) 16px 10px;display:flex;align-items:center;gap:8px;z-index:5}
+header h1{font-size:18px;margin:0;flex:1}
+.pill{font-size:12px;padding:3px 8px;border-radius:99px;background:var(--line);color:var(--muted)}
+.pill.ok{background:#dcfce7;color:#166534}.pill.off{background:#fee2e2;color:#991b1b}
+button{font:inherit;cursor:pointer;border:0;border-radius:10px;padding:10px 14px;background:var(--line);color:var(--text)}
+button.primary{background:var(--accent);color:#fff}
+button.icon{padding:6px 10px;background:transparent;font-size:20px}
+main{max-width:720px;margin:0 auto;padding:16px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:14px}
+.monthbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.monthbar h2{margin:0;font-size:17px}
+.grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
+.dow{text-align:center;font-size:11px;color:var(--muted);padding:4px 0}
+.day{aspect-ratio:1;border-radius:10px;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding-top:6px;font-size:14px;background:transparent;position:relative}
+.day.other{color:var(--muted);opacity:.45}
+.day.today{background:var(--today);font-weight:600}
+.day.sel{outline:2px solid var(--accent)}
+.dots{display:flex;gap:2px;margin-top:4px}
+.dot{width:5px;height:5px;border-radius:50%;background:var(--accent)}
+.dot.att{background:var(--green)}
+.ev{display:flex;gap:10px;align-items:flex-start;padding:10px 0;border-top:1px solid var(--line)}
+.ev:first-child{border-top:0}
+.ev .t{font-size:13px;color:var(--muted);min-width:86px}
+.ev .b{flex:1}.ev .b b{display:block}
+.ev .b small{color:var(--muted)}
+.empty{color:var(--muted);font-size:14px;padding:6px 0}
+.att-btns{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.att-btns button{padding:22px;font-size:20px;font-weight:600;color:#fff}
+.enter{background:var(--green)!important}.exit{background:var(--red)!important}
+.att-btns button:disabled{opacity:.35}
+.status{text-align:center;margin:12px 0 0;color:var(--muted)}
+.log-day{border-top:1px solid var(--line);padding:10px 0}
+.log-day:first-child{border-top:0}
+.log-head{display:flex;justify-content:space-between;font-weight:600;margin-bottom:4px}
+.log-row{display:flex;justify-content:space-between;font-size:14px;color:var(--muted);padding:2px 0}
+nav{position:fixed;bottom:0;left:0;right:0;background:var(--card);border-top:1px solid var(--line);display:flex;padding-bottom:env(safe-area-inset-bottom);z-index:5}
+nav button{flex:1;border-radius:0;background:transparent;padding:14px;color:var(--muted)}
+nav button.on{color:var(--accent);font-weight:600}
+dialog{border:0;border-radius:16px;padding:0;width:min(440px,92vw);background:var(--card);color:var(--text)}
+dialog::backdrop{background:rgba(0,0,0,.4)}
+form{padding:18px;display:flex;flex-direction:column;gap:10px}
+label{font-size:13px;color:var(--muted);display:flex;flex-direction:column;gap:4px}
+input,textarea{font:inherit;padding:10px;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--text)}
+.row{display:flex;gap:8px}.row>*{flex:1}
+.actions{display:flex;gap:8px;justify-content:flex-end;margin-top:6px}
+.hidden{display:none}
+.fab{position:fixed;right:18px;bottom:calc(78px + env(safe-area-inset-bottom));width:56px;height:56px;border-radius:50%;font-size:28px;background:var(--accent);color:#fff;box-shadow:0 4px 14px rgba(0,0,0,.25);z-index:4}
+</style>
+</head>
+<body>
+<header>
+  <h1 id="title">Calendar</h1>
+  <span id="syncPill" class="pill">local</span>
+  <button class="icon" id="syncBtn" title="Sync now">⟳</button>
+  <button class="icon" id="setBtn" title="Settings">⚙</button>
+</header>
+
+<main>
+  <section id="calView">
+    <div class="card">
+      <div class="monthbar">
+        <button class="icon" id="prev">‹</button>
+        <h2 id="monthLabel"></h2>
+        <button class="icon" id="next">›</button>
+      </div>
+      <div class="grid" id="grid"></div>
+    </div>
+    <div class="card">
+      <div class="monthbar"><h2 id="dayLabel"></h2><button id="todayBtn">Today</button></div>
+      <div id="dayEvents"></div>
+    </div>
+    <button class="fab" id="addBtn" title="Add event">+</button>
+  </section>
+
+  <section id="attView" class="hidden">
+    <div class="card">
+      <div class="att-btns">
+        <button class="enter" id="enterBtn">Enter</button>
+        <button class="exit" id="exitBtn">Exit</button>
+      </div>
+      <p class="status" id="attStatus"></p>
+    </div>
+    <div class="card">
+      <div class="monthbar"><h2>Daily log</h2></div>
+      <div id="log"></div>
+    </div>
+  </section>
+</main>
+
+<nav>
+  <button id="tabCal" class="on">📅 Calendar</button>
+  <button id="tabAtt">🕘 Attendance</button>
+</nav>
+
+<dialog id="evDlg">
+  <form id="evForm" method="dialog">
+    <h3 id="evDlgTitle" style="margin:0">New event</h3>
+    <label>Title<input id="evTitle" required></label>
+    <label>Date<input type="date" id="evDate" required></label>
+    <div class="row">
+      <label>Start<input type="time" id="evStart"></label>
+      <label>End<input type="time" id="evEnd"></label>
+    </div>
+    <label>Notes<textarea id="evNotes" rows="2"></textarea></label>
+    <div class="actions">
+      <button type="button" id="evDel" style="margin-right:auto;color:var(--red)">Delete</button>
+      <button type="button" id="evCancel">Cancel</button>
+      <button type="submit" class="primary">Save</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="setDlg">
+  <form id="setForm" method="dialog">
+    <h3 style="margin:0">Sync settings</h3>
+    <small style="color:var(--muted)">Data syncs to a JSON file in a GitHub repo (keep it private). Stored only on this device.</small>
+    <label>GitHub username / org<input id="sOwner" placeholder="your-username"></label>
+    <label>Data repo<input id="sRepo" placeholder="calendar-data"></label>
+    <label>Personal access token<input id="sToken" type="password" placeholder="github_pat_…"></label>
+    <div class="actions">
+      <button type="button" id="setCancel">Cancel</button>
+      <button type="submit" class="primary">Save</button>
+    </div>
+  </form>
+</dialog>
+
+<script>
+// ---------- storage ----------
+const KEY='cal-data-v1', SKEY='cal-sync-v1', FILE='data.json';
+const load=(k,d)=>{try{return JSON.parse(localStorage.getItem(k))??d}catch{return d}};
+const save=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v))}catch{}};
+let db=load(KEY,{events:[],attendance:[]});
+let cfg=load(SKEY,{owner:'',repo:'',token:''});
+const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,8);
+const persist=()=>{save(KEY,db);scheduleSync()};
+const live=a=>a.filter(x=>!x.deleted);
+
+// ---------- dates ----------
+const pad=n=>String(n).padStart(2,'0');
+const ymd=d=>`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+const fmtTime=ts=>new Date(ts).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+const fmtDur=ms=>{const m=Math.round(ms/60000);return `${Math.floor(m/60)}h ${pad(m%60)}m`};
+let view=new Date(); view.setDate(1);
+let sel=ymd(new Date());
+
+// ---------- calendar ----------
+const $=id=>document.getElementById(id);
+function renderCal(){
+  const y=view.getFullYear(), m=view.getMonth();
+  $('monthLabel').textContent=view.toLocaleDateString([], {month:'long',year:'numeric'});
+  const g=$('grid'); g.innerHTML='';
+  ['M','T','W','T','F','S','S'].forEach(d=>g.insertAdjacentHTML('beforeend',`<div class="dow">${d}</div>`));
+  const first=new Date(y,m,1), start=new Date(first); start.setDate(1-((first.getDay()+6)%7));
+  const evDays=new Set(live(db.events).map(e=>e.date));
+  const attDays=new Set(live(db.attendance).map(a=>ymd(new Date(a.ts))));
+  const today=ymd(new Date());
+  for(let i=0;i<42;i++){
+    const d=new Date(start); d.setDate(start.getDate()+i); const k=ymd(d);
+    const b=document.createElement('button');
+    b.className='day'+(d.getMonth()!==m?' other':'')+(k===today?' today':'')+(k===sel?' sel':'');
+    b.innerHTML=`${d.getDate()}<span class="dots">${evDays.has(k)?'<i class="dot"></i>':''}${attDays.has(k)?'<i class="dot att"></i>':''}</span>`;
+    b.onclick=()=>{sel=k; if(d.getMonth()!==m){view=new Date(d.getFullYear(),d.getMonth(),1)} renderCal()};
+    g.appendChild(b);
+  }
+  renderDay();
+}
+function renderDay(){
+  const d=new Date(sel+'T00:00');
+  $('dayLabel').textContent=d.toLocaleDateString([], {weekday:'short',day:'numeric',month:'short'});
+  const evs=live(db.events).filter(e=>e.date===sel).sort((a,b)=>(a.start||'').localeCompare(b.start||''));
+  const box=$('dayEvents');
+  box.innerHTML=evs.length?'':'<div class="empty">No events. Tap + to add.</div>';
+  evs.forEach(e=>{
+    const el=document.createElement('div'); el.className='ev';
+    el.innerHTML=`<div class="t">${e.start?e.start+(e.end?'–'+e.end:''):'All day'}</div><div class="b"><b></b><small></small></div>`;
+    el.querySelector('b').textContent=e.title; el.querySelector('small').textContent=e.notes||'';
+    el.onclick=()=>openEv(e); box.appendChild(el);
+  });
+}
+let editing=null;
+function openEv(e){
+  editing=e||null;
+  $('evDlgTitle').textContent=e?'Edit event':'New event';
+  $('evTitle').value=e?.title||''; $('evDate').value=e?.date||sel;
+  $('evStart').value=e?.start||''; $('evEnd').value=e?.end||''; $('evNotes').value=e?.notes||'';
+  $('evDel').style.visibility=e?'visible':'hidden';
+  $('evDlg').showModal();
+}
+$('evForm').onsubmit=()=>{
+  const data={title:$('evTitle').value.trim(),date:$('evDate').value,start:$('evStart').value,end:$('evEnd').value,notes:$('evNotes').value.trim(),updatedAt:Date.now()};
+  if(editing) Object.assign(editing,data); else db.events.push({id:uid(),...data});
+  sel=data.date; persist(); renderCal();
+};
+$('evDel').onclick=()=>{if(editing&&confirm('Delete this event?')){editing.deleted=true;editing.updatedAt=Date.now();persist();$('evDlg').close();renderCal()}};
+$('evCancel').onclick=()=>$('evDlg').close();
+$('addBtn').onclick=()=>openEv();
+$('prev').onclick=()=>{view.setMonth(view.getMonth()-1);renderCal()};
+$('next').onclick=()=>{view.setMonth(view.getMonth()+1);renderCal()};
+$('todayBtn').onclick=()=>{view=new Date();view.setDate(1);sel=ymd(new Date());renderCal()};
+
+// ---------- attendance ----------
+function punches(){return live(db.attendance).sort((a,b)=>a.ts-b.ts)}
+function renderAtt(){
+  const p=punches(), last=p[p.length-1], inside=last?.type==='enter';
+  $('enterBtn').disabled=inside; $('exitBtn').disabled=!inside;
+  $('attStatus').textContent=last?`${inside?'Entered':'Exited'} at ${fmtTime(last.ts)} · ${new Date(last.ts).toLocaleDateString()}`:'No entries yet';
+  const byDay={}; p.forEach(x=>(byDay[ymd(new Date(x.ts))]??=[]).push(x));
+  const log=$('log'); log.innerHTML='';
+  const days=Object.keys(byDay).sort().reverse();
+  if(!days.length){log.innerHTML='<div class="empty">Your daily log will show here.</div>';return}
+  days.forEach(k=>{
+    const items=byDay[k]; let total=0, open=null;
+    items.forEach(x=>{if(x.type==='enter')open=x.ts; else if(open){total+=x.ts-open;open=null}});
+    if(open&&k===ymd(new Date())) total+=Date.now()-open;
+    const div=document.createElement('div'); div.className='log-day';
+    div.innerHTML=`<div class="log-head"><span>${new Date(k+'T00:00').toLocaleDateString([], {weekday:'short',day:'numeric',month:'short',year:'numeric'})}</span><span>${fmtDur(total)}</span></div>`+
+      items.map(x=>`<div class="log-row"><span>${x.type==='enter'?'🟢 Enter':'🔴 Exit'}</span><span>${fmtTime(x.ts)}</span></div>`).join('');
+    log.appendChild(div);
+  });
+}
+function punch(type){db.attendance.push({id:uid(),type,ts:Date.now(),updatedAt:Date.now()});persist();renderAtt();renderCal()}
+$('enterBtn').onclick=()=>punch('enter');
+$('exitBtn').onclick=()=>punch('exit');
+
+// ---------- tabs ----------
+function tab(t){
+  $('calView').classList.toggle('hidden',t!=='cal'); $('attView').classList.toggle('hidden',t!=='att');
+  $('tabCal').classList.toggle('on',t==='cal'); $('tabAtt').classList.toggle('on',t==='att');
+  $('title').textContent=t==='cal'?'Calendar':'Attendance';
+  if(t==='att')renderAtt();
+}
+$('tabCal').onclick=()=>tab('cal'); $('tabAtt').onclick=()=>tab('att');
+
+// ---------- GitHub sync ----------
+const pill=(txt,cls)=>{const p=$('syncPill');p.textContent=txt;p.className='pill '+(cls||'')};
+const configured=()=>cfg.owner&&cfg.repo&&cfg.token;
+function merge(a,b){const m=new Map();[...a,...b].forEach(x=>{const c=m.get(x.id);if(!c||(x.updatedAt||0)>(c.updatedAt||0))m.set(x.id,x)});return [...m.values()]}
+const b64e=s=>btoa(unescape(encodeURIComponent(s)));
+const b64d=s=>decodeURIComponent(escape(atob(s.replace(/\n/g,''))));
+let syncing=false, timer=null;
+function scheduleSync(){clearTimeout(timer);timer=setTimeout(sync,1500)}
+async function sync(){
+  if(!configured()){pill('local');return}
+  if(!navigator.onLine){pill('offline','off');return}
+  if(syncing)return; syncing=true; pill('syncing…');
+  const url=`https://api.github.com/repos/${cfg.owner}/${cfg.repo}/contents/${FILE}`;
+  const h={Authorization:`Bearer ${cfg.token}`,Accept:'application/vnd.github+json'};
+  try{
+    for(let attempt=0;attempt<3;attempt++){
+      let sha, remote={events:[],attendance:[]};
+      const r=await fetch(url+'?t='+Date.now(),{headers:h,cache:'no-store'});
+      if(r.ok){const j=await r.json();sha=j.sha;remote=JSON.parse(b64d(j.content))}
+      else if(r.status!==404) throw new Error('GET '+r.status);
+      db={events:merge(db.events,remote.events||[]),attendance:merge(db.attendance,remote.attendance||[])};
+      save(KEY,db);
+      const p=await fetch(url,{method:'PUT',headers:h,body:JSON.stringify({message:'sync '+new Date().toISOString(),content:b64e(JSON.stringify(db)),...(sha?{sha}:{})})});
+      if(p.ok){pill('synced','ok');break}
+      if(p.status!==409&&p.status!==422) throw new Error('PUT '+p.status);
+    }
+  }catch(e){console.error(e);pill('sync error','off')}
+  syncing=false; renderCal(); if(!$('attView').classList.contains('hidden'))renderAtt();
+}
+$('syncBtn').onclick=sync;
+window.addEventListener('online',sync);
+window.addEventListener('offline',()=>pill('offline','off'));
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)sync()});
+$('setBtn').onclick=()=>{$('sOwner').value=cfg.owner;$('sRepo').value=cfg.repo;$('sToken').value=cfg.token;$('setDlg').showModal()};
+$('setCancel').onclick=()=>$('setDlg').close();
+$('setForm').onsubmit=()=>{cfg={owner:$('sOwner').value.trim(),repo:$('sRepo').value.trim(),token:$('sToken').value.trim()};save(SKEY,cfg);sync()};
+
+// ---------- boot ----------
+if('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');
+renderCal(); sync();
+setInterval(()=>{if(!$('attView').classList.contains('hidden'))renderAtt()},60000);
+</script>
+</body>
+</html>
