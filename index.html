@@ -50,6 +50,9 @@ main{max-width:720px;margin:0 auto;padding:16px}
 .enter{background:var(--green)!important}.exit{background:var(--red)!important}
 .att-btns button:disabled{opacity:.35}
 .status{text-align:center;margin:12px 0 0;color:var(--muted)}
+/*m*/.log-month{text-align:center;font-weight:700;font-size:15px;color:var(--accent);padding:12px 0 6px;border-top:1px solid var(--line);letter-spacing:.3px}
+.log-month:first-child{border-top:0;padding-top:2px}
+.log-month+.log-day{border-top:0}
 .log-day{border-top:1px solid var(--line);padding:10px 0}
 .log-day:first-child{border-top:0}
 .log-head{display:flex;justify-content:space-between;font-weight:600;margin-bottom:4px}
@@ -231,7 +234,10 @@ function renderAtt(){
   const log=$('log'); log.innerHTML='';
   const days=Object.keys(byDay).sort().reverse();
   if(!days.length){log.innerHTML='<div class="empty">Your daily log will show here.</div>';return}
+  let curMonth='';
   days.forEach(k=>{
+    const mk=k.slice(0,7);
+    if(mk!==curMonth){curMonth=mk;const h=document.createElement('div');h.className='log-month';h.textContent=new Date(k+'T00:00').toLocaleDateString([], {month:'long',year:'numeric'});log.appendChild(h)}
     const items=byDay[k]; let total=0, open=null;
     items.forEach(x=>{if(x.type==='enter')open=x.ts; else if(open){total+=x.ts-open;open=null}});
     if(open&&k===ymd(new Date())) total+=Date.now()-open;
