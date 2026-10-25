@@ -45,6 +45,7 @@ main{max-width:720px;margin:0 auto;padding:16px}
 .ev .b{flex:1}.ev .b b{display:block}
 .ev .b small{color:var(--muted)}
 .empty{color:var(--muted);font-size:14px;padding:6px 0}
+.att-dock{position:sticky;bottom:calc(64px + env(safe-area-inset-bottom));margin-bottom:0;box-shadow:0 -4px 14px rgba(0,0,0,.12);z-index:3}
 .att-btns{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 .att-btns button{padding:22px;font-size:20px;font-weight:600;color:#fff}
 .enter{background:var(--green)!important}.exit{background:var(--red)!important}
@@ -98,15 +99,15 @@ input,textarea{font:inherit;padding:10px;border:1px solid var(--line);border-rad
 
   <section id="attView" class="hidden">
     <div class="card">
+      <div class="monthbar"><h2>Daily log</h2></div>
+      <div id="log"></div>
+    </div>
+    <div class="card att-dock">
       <div class="att-btns">
         <button class="enter" id="enterBtn">Enter</button>
         <button class="exit" id="exitBtn">Exit</button>
       </div>
       <p class="status" id="attStatus"></p>
-    </div>
-    <div class="card">
-      <div class="monthbar"><h2>Daily log</h2></div>
-      <div id="log"></div>
     </div>
   </section>
 </main>
