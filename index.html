@@ -32,7 +32,7 @@ main{max-width:720px;margin:0 auto;padding:16px}
 .day .num{text-align:center;margin-bottom:2px}
 .chip{display:block;font-size:10px;line-height:1.25;background:var(--accent);color:#fff;border-radius:4px;padding:1px 3px;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:left}
 .more{font-size:10px;color:var(--muted);text-align:left;padding-left:2px}
-.attbar{height:3px;border-radius:2px;background:var(--green);margin-top:auto}
+.hrs{margin-top:auto;font-size:10px;font-weight:600;color:var(--green);text-align:center;white-space:nowrap}
 .day.other{color:var(--muted);opacity:.45}
 .day.today{background:var(--today);font-weight:600}
 .day.sel{outline:2px solid var(--accent)}
@@ -178,14 +178,17 @@ function renderCal(){
   const first=new Date(y,m,1), start=new Date(first); start.setDate(1-((first.getDay()+6)%7));
   const evByDay={}; live(db.events).sort((a,b)=>(a.start||'').localeCompare(b.start||'')).forEach(e=>(evByDay[e.date]??=[]).push(e));
   const esc=t=>t.replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-  const attDays=new Set(live(db.attendance).map(a=>ymd(new Date(a.ts))));
+  const hrsByDay={}; {const today=ymd(new Date()); const byD={};
+    live(db.attendance).sort((a,b)=>a.ts-b.ts).forEach(x=>(byD[ymd(new Date(x.ts))]??=[]).push(x));
+    for(const k in byD){let t=0,o=null;byD[k].forEach(x=>{if(x.type==='enter')o=x.ts;else if(o){t+=x.ts-o;o=null}});
+      if(o&&k===today)t+=Date.now()-o; const m=Math.round(t/60000); hrsByDay[k]=m?`${Math.floor(m/60)}h ${pad(m%60)}m`:'0h';}}
   const today=ymd(new Date());
   for(let i=0;i<42;i++){
     const d=new Date(start); d.setDate(start.getDate()+i); const k=ymd(d);
     const b=document.createElement('button');
     b.className='day'+(d.getMonth()!==m?' other':'')+(k===today?' today':'')+(k===sel?' sel':'');
     const evs=evByDay[k]||[];
-    b.innerHTML=`<span class="num">${d.getDate()}</span>`+evs.slice(0,2).map(e=>`<span class="chip">${esc(e.title)}</span>`).join('')+(evs.length>2?`<span class="more">+${evs.length-2} more</span>`:'')+(attDays.has(k)?'<span class="attbar"></span>':'');
+    b.innerHTML=`<span class="num">${d.getDate()}</span>`+evs.slice(0,2).map(e=>`<span class="chip">${esc(e.title)}</span>`).join('')+(evs.length>2?`<span class="more">+${evs.length-2} more</span>`:'')+(hrsByDay[k]?`<span class="hrs">${hrsByDay[k]}</span>`:'');
     b.onclick=()=>{sel=k; if(d.getMonth()!==m){view=new Date(d.getFullYear(),d.getMonth(),1)} renderCal()};
     g.appendChild(b);
   }
