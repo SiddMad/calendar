@@ -59,7 +59,7 @@ main{max-width:720px;margin:0 auto;padding:16px}
 .log-head{display:flex;justify-content:space-between;font-weight:600;margin-bottom:4px}
 .log-row{display:flex;justify-content:space-between;font-size:14px;color:var(--muted);padding:2px 0}
 nav{position:fixed;bottom:0;left:0;right:0;background:var(--card);border-top:1px solid var(--line);display:flex;padding-bottom:env(safe-area-inset-bottom);z-index:5}
-nav button{flex:1;border-radius:0;background:transparent;padding:14px 4px;white-space:nowrap;font-size:14px;color:var(--muted)}
+nav button{flex:1;border-radius:0;background:transparent;padding:14px;color:var(--muted)}
 nav button.on{color:var(--accent);font-weight:600}
 dialog{border:0;border-radius:16px;padding:0;width:min(440px,92vw);background:var(--card);color:var(--text)}
 dialog::backdrop{background:rgba(0,0,0,.4)}
@@ -69,12 +69,6 @@ input,textarea{font:inherit;padding:10px;border:1px solid var(--line);border-rad
 .row{display:flex;gap:8px}.row>*{flex:1}
 .actions{display:flex;gap:8px;justify-content:flex-end;margin-top:6px}
 .hidden{display:none}
-#noteText{width:100%;min-height:42vh;resize:vertical;font-size:15px;line-height:1.5}
-.note-meta{font-size:12px;color:var(--muted);text-align:right;margin-top:6px}
-.note-item{border-top:1px solid var(--line);padding:10px 0;cursor:pointer}
-.note-item:first-child{border-top:0}
-.note-item b{display:block;font-size:14px;margin-bottom:2px}
-.note-item span{font-size:13px;color:var(--muted);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;white-space:pre-wrap}
 .fab{position:fixed;right:18px;bottom:calc(78px + env(safe-area-inset-bottom));width:56px;height:56px;border-radius:50%;font-size:28px;background:var(--accent);color:#fff;box-shadow:0 4px 14px rgba(0,0,0,.25);z-index:4}
 </style>
 </head>
@@ -116,27 +110,11 @@ input,textarea{font:inherit;padding:10px;border:1px solid var(--line);border-rad
       <p class="status" id="attStatus"></p>
     </div>
   </section>
-  <section id="noteView" class="hidden">
-    <div class="card">
-      <div class="monthbar">
-        <button class="icon" id="nPrev">‹</button>
-        <h2 id="noteLabel"></h2>
-        <button class="icon" id="nNext">›</button>
-      </div>
-      <textarea id="noteText" placeholder="Write anything for this day…"></textarea>
-      <div class="note-meta" id="noteMeta"></div>
-    </div>
-    <div class="card">
-      <div class="monthbar"><h2>Past notes</h2><button id="nToday">Today</button></div>
-      <div id="noteList"></div>
-    </div>
-  </section>
 </main>
 
 <nav>
   <button id="tabCal" class="on">📅 Calendar</button>
   <button id="tabAtt">🕘 Attendance</button>
-  <button id="tabNote">📝 Notes</button>
 </nav>
 
 <dialog id="evDlg">
@@ -176,7 +154,7 @@ input,textarea{font:inherit;padding:10px;border:1px solid var(--line);border-rad
 const KEY='cal-data-v1', SKEY='cal-sync-v1', FILE='data.json';
 const load=(k,d)=>{try{return JSON.parse(localStorage.getItem(k))??d}catch{return d}};
 const save=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v))}catch{}};
-let db=load(KEY,{events:[],attendance:[],notes:[]}); db.notes??=[];
+let db=load(KEY,{events:[],attendance:[]});
 let cfg=load(SKEY,{owner:'',repo:'',token:''});
 const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,8);
 const persist=()=>{save(KEY,db);scheduleSync()};
@@ -274,43 +252,14 @@ function punch(type){db.attendance.push({id:uid(),type,ts:Date.now(),updatedAt:D
 $('enterBtn').onclick=()=>punch('enter');
 $('exitBtn').onclick=()=>punch('exit');
 
-// ---------- notes ----------
-let noteDay=ymd(new Date()), noteTimer=null;
-const noteOf=k=>db.notes.find(n=>n.id==='note-'+k);
-function renderNote(){
-  $('noteLabel').textContent=new Date(noteDay+'T00:00').toLocaleDateString([], {weekday:'short',day:'numeric',month:'short',year:'numeric'});
-  const n=noteOf(noteDay);
-  if(document.activeElement!==$('noteText')) $('noteText').value=n?.text||'';
-  $('noteMeta').textContent=n?.text?'Saved '+fmtTime(n.updatedAt):'';
-  const list=$('noteList'); list.innerHTML='';
-  const items=db.notes.filter(x=>x.text&&x.text.trim()&&x.date!==noteDay).sort((a,b)=>b.date.localeCompare(a.date));
-  if(!items.length){list.innerHTML='<div class="empty">No other notes yet.</div>';return}
-  items.forEach(x=>{const d=document.createElement('div');d.className='note-item';
-    d.innerHTML='<b></b><span></span>';
-    d.querySelector('b').textContent=new Date(x.date+'T00:00').toLocaleDateString([], {weekday:'short',day:'numeric',month:'short',year:'numeric'});
-    d.querySelector('span').textContent=x.text;
-    d.onclick=()=>{noteDay=x.date;$('noteText').blur();renderNote();scrollTo(0,0)}; list.appendChild(d)});
-}
-$('noteText').oninput=()=>{
-  clearTimeout(noteTimer);
-  noteTimer=setTimeout(()=>{
-    const text=$('noteText').value; let n=noteOf(noteDay);
-    if(n){n.text=text;n.updatedAt=Date.now()} else db.notes.push({id:'note-'+noteDay,date:noteDay,text,updatedAt:Date.now()});
-    persist(); $('noteMeta').textContent='Saved '+fmtTime(Date.now());
-  },500);
-};
-const shiftNote=d=>{const x=new Date(noteDay+'T00:00');x.setDate(x.getDate()+d);noteDay=ymd(x);$('noteText').blur();renderNote()};
-$('nPrev').onclick=()=>shiftNote(-1); $('nNext').onclick=()=>shiftNote(1);
-$('nToday').onclick=()=>{noteDay=ymd(new Date());$('noteText').blur();renderNote()};
-
 // ---------- tabs ----------
 function tab(t){
-  $('calView').classList.toggle('hidden',t!=='cal'); $('attView').classList.toggle('hidden',t!=='att'); $('noteView').classList.toggle('hidden',t!=='note');
-  $('tabCal').classList.toggle('on',t==='cal'); $('tabAtt').classList.toggle('on',t==='att'); $('tabNote').classList.toggle('on',t==='note');
-  $('title').textContent={cal:'Calendar',att:'Attendance',note:'Notes'}[t];
-  if(t==='att')renderAtt(); if(t==='note')renderNote();
+  $('calView').classList.toggle('hidden',t!=='cal'); $('attView').classList.toggle('hidden',t!=='att');
+  $('tabCal').classList.toggle('on',t==='cal'); $('tabAtt').classList.toggle('on',t==='att');
+  $('title').textContent=t==='cal'?'Calendar':'Attendance';
+  if(t==='att')renderAtt();
 }
-$('tabCal').onclick=()=>tab('cal'); $('tabAtt').onclick=()=>tab('att'); $('tabNote').onclick=()=>tab('note');
+$('tabCal').onclick=()=>tab('cal'); $('tabAtt').onclick=()=>tab('att');
 
 // ---------- GitHub sync ----------
 const pill=(txt,cls)=>{const p=$('syncPill');p.textContent=txt;p.className='pill '+(cls||'')};
@@ -328,18 +277,18 @@ async function sync(){
   const h={Authorization:`Bearer ${cfg.token}`,Accept:'application/vnd.github+json'};
   try{
     for(let attempt=0;attempt<3;attempt++){
-      let sha, remote={events:[],attendance:[],notes:[]};
+      let sha, remote={events:[],attendance:[]};
       const r=await fetch(url+'?t='+Date.now(),{headers:h,cache:'no-store'});
       if(r.ok){const j=await r.json();sha=j.sha;remote=JSON.parse(b64d(j.content))}
       else if(r.status!==404) throw new Error('GET '+r.status);
-      db={events:merge(db.events,remote.events||[]),attendance:merge(db.attendance,remote.attendance||[]),notes:merge(db.notes||[],remote.notes||[])};
+      db={events:merge(db.events,remote.events||[]),attendance:merge(db.attendance,remote.attendance||[])};
       save(KEY,db);
       const p=await fetch(url,{method:'PUT',headers:h,body:JSON.stringify({message:'sync '+new Date().toISOString(),content:b64e(JSON.stringify(db)),...(sha?{sha}:{})})});
       if(p.ok){pill('synced','ok');break}
       if(p.status!==409&&p.status!==422) throw new Error('PUT '+p.status);
     }
   }catch(e){console.error(e);pill('sync error','off')}
-  syncing=false; renderCal(); if(!$('attView').classList.contains('hidden'))renderAtt(); if(!$('noteView').classList.contains('hidden'))renderNote();
+  syncing=false; renderCal(); if(!$('attView').classList.contains('hidden'))renderAtt();
 }
 $('syncBtn').onclick=sync;
 window.addEventListener('online',sync);
