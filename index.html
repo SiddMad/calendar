@@ -57,7 +57,10 @@ main{max-width:720px;margin:0 auto;padding:16px}
 .log-day{border-top:1px solid var(--line);padding:10px 0}
 .log-day:first-child{border-top:0}
 .log-head{display:flex;justify-content:space-between;font-weight:600;margin-bottom:4px}
-.log-row{display:flex;justify-content:space-between;font-size:14px;color:var(--muted);padding:2px 0}
+.log-row{display:flex;justify-content:space-between;font-size:14px;color:var(--muted);padding:6px 4px;border-radius:8px;cursor:pointer}
+.log-row:active{background:var(--line)}
+.log-row .pen{opacity:.5;margin-left:6px;font-size:12px}
+select{font:inherit;padding:10px;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--text)}
 nav{position:fixed;bottom:0;left:0;right:0;background:var(--card);border-top:1px solid var(--line);display:flex;padding-bottom:env(safe-area-inset-bottom);z-index:5}
 nav button{flex:1;border-radius:0;background:transparent;padding:14px;color:var(--muted)}
 nav button.on{color:var(--accent);font-weight:600}
@@ -99,7 +102,7 @@ input,textarea{font:inherit;padding:10px;border:1px solid var(--line);border-rad
 
   <section id="attView" class="hidden">
     <div class="card">
-      <div class="monthbar"><h2>Daily log</h2></div>
+      <div class="monthbar"><h2>Daily log</h2><button id="addPunch">+ Add</button></div>
       <div id="log"></div>
     </div>
     <div class="card att-dock">
@@ -130,6 +133,22 @@ input,textarea{font:inherit;padding:10px;border:1px solid var(--line);border-rad
     <div class="actions">
       <button type="button" id="evDel" style="margin-right:auto;color:var(--red)">Delete</button>
       <button type="button" id="evCancel">Cancel</button>
+      <button type="submit" class="primary">Save</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="pDlg">
+  <form id="pForm" method="dialog">
+    <h3 id="pTitle" style="margin:0">Edit entry</h3>
+    <label>Type<select id="pType"><option value="enter">Enter</option><option value="exit">Exit</option></select></label>
+    <div class="row">
+      <label>Date<input type="date" id="pDate" required></label>
+      <label>Time<input type="time" id="pTime" required></label>
+    </div>
+    <div class="actions">
+      <button type="button" id="pDel" style="margin-right:auto;color:var(--red)">Delete</button>
+      <button type="button" id="pCancel">Cancel</button>
       <button type="submit" class="primary">Save</button>
     </div>
   </form>
@@ -247,11 +266,29 @@ function renderAtt(){
     if(open&&k===ymd(new Date())) total+=Date.now()-open;
     const div=document.createElement('div'); div.className='log-day';
     div.innerHTML=`<div class="log-head"><span>${new Date(k+'T00:00').toLocaleDateString([], {weekday:'short',day:'numeric',month:'short',year:'numeric'})}</span><span>${fmtDur(total)}</span></div>`+
-      items.map(x=>`<div class="log-row"><span>${x.type==='enter'?'🟢 Enter':'🔴 Exit'}</span><span>${fmtTime(x.ts)}</span></div>`).join('');
+      '';
+    items.forEach(x=>{const r=document.createElement('div');r.className='log-row';
+      r.innerHTML=`<span>${x.type==='enter'?'🟢 Enter':'🔴 Exit'}</span><span>${fmtTime(x.ts)}<span class="pen">✎</span></span>`;
+      r.onclick=()=>openPunch(x); div.appendChild(r)});
     log.appendChild(div);
   });
 }
 function punch(type){db.attendance.push({id:uid(),type,ts:Date.now(),updatedAt:Date.now()});persist();renderAtt();renderCal()}
+let pEdit=null;
+function openPunch(x){
+  pEdit=x||null; const d=new Date(x?x.ts:Date.now());
+  $('pTitle').textContent=x?'Edit entry':'Add entry';
+  $('pType').value=x?x.type:'enter'; $('pDate').value=ymd(d); $('pTime').value=`${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  $('pDel').style.visibility=x?'visible':'hidden'; $('pDlg').showModal();
+}
+$('pForm').onsubmit=()=>{
+  const ts=new Date($('pDate').value+'T'+$('pTime').value).getTime(), type=$('pType').value;
+  if(pEdit) Object.assign(pEdit,{ts,type,updatedAt:Date.now()}); else db.attendance.push({id:uid(),type,ts,updatedAt:Date.now()});
+  persist(); renderAtt(); renderCal();
+};
+$('pDel').onclick=()=>{if(pEdit&&confirm('Delete this entry?')){pEdit.deleted=true;pEdit.updatedAt=Date.now();persist();$('pDlg').close();renderAtt();renderCal()}};
+$('pCancel').onclick=()=>$('pDlg').close();
+$('addPunch').onclick=()=>openPunch();
 $('enterBtn').onclick=()=>punch('enter');
 $('exitBtn').onclick=()=>punch('exit');
 
